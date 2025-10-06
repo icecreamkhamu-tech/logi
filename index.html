@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Login</title>
+<style>
+body { font-family: Arial; background:#f4f4f4; display:flex; justify-content:center; align-items:center; height:100vh; }
+.container { background:white; padding:20px; border-radius:8px; box-shadow:0 2px 8px rgba(0,0,0,0.2); width:300px; }
+h2 { text-align:center; }
+input { width:100%; padding:10px; margin:5px 0; border-radius:4px; border:1px solid #ccc; }
+button { width:100%; padding:10px; background:#4CAF50; color:white; border:none; border-radius:4px; cursor:pointer; }
+button:hover { background:#45a049; }
+.link { text-align:center; margin-top:10px; }
+.link a { color:#4CAF50; text-decoration:none; }
+</style>
+</head>
+<body>
+<div class="container">
+<h2>Login</h2>
+<input type="email" id="email" placeholder="Email">
+<input type="password" id="password" placeholder="Password">
+<button onclick="login()">Login</button>
+<div class="link">
+<a href="https://icecreamkhamu-tech.github.io/forg/">Forget Password?</a><br>
+<a href="https://icecreamkhamu-tech.github.io/singu/">Create Account</a>
+</div>
+</div>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-app.js";
+import { getAuth, signInWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-auth.js";
+
+const firebaseConfig = {
+    apiKey: "AIzaSyDA3y67A-d77q1zwh5_GHtYundQyudvbdc",
+    authDomain: "freefire-7f9b7.firebaseapp.com",
+    projectId: "freefire-7f9b7",
+    storageBucket: "freefire-7f9b7.appspot.com",
+    messagingSenderId: "69091172437",
+    appId: "1:69091172437:web:fd82e4ded5d5252bf4b4dc",
+    measurementId: "G-8T21K8TEN0"
+};
+
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+
+async function login(){
+    const email = document.getElementById("email").value;
+    const password = document.getElementById("password").value;
+
+    if(!email || !password){
+        alert("Both fields are required.");
+        return;
+    }
+
+    try{
+        await signInWithEmailAndPassword(auth, email, password);
+        window.location.href = "main";
+    } catch(error){
+        alert(error.message);
+    }
+}
+</script>
+</body>
+</html>
