@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -20,15 +20,17 @@ button{background:#4CAF50;color:#fff;border:none;cursor:pointer}
 </head>
 <body>
 
+<!-- LOGIN PAGE -->
 <div id="loginPage" class="container">
   <h2>Login</h2>
   <input id="loginEmail" type="email" placeholder="Email">
   <input id="loginPass" type="password" placeholder="Password">
   <button onclick="login()">Login</button>
-  <a href="#" onclick="showPage('forgotPage')">Forgot Password?</a>
+  <a href="#" onclick="showPage('forgotPage')">Forgot Password?</a><br>
   <a href="#" onclick="showPage('signupPage')">Create Account</a>
 </div>
 
+<!-- SIGNUP PAGE -->
 <div id="signupPage" class="container hidden">
   <h2>Sign Up</h2>
   <input id="name" placeholder="Full Name">
@@ -40,6 +42,7 @@ button{background:#4CAF50;color:#fff;border:none;cursor:pointer}
   <a href="#" onclick="showPage('loginPage')">Back to Login</a>
 </div>
 
+<!-- FORGOT PASSWORD PAGE -->
 <div id="forgotPage" class="container hidden">
   <h2>Reset Password</h2>
   <input id="forgotEmail" type="email" placeholder="Enter Email">
@@ -47,6 +50,7 @@ button{background:#4CAF50;color:#fff;border:none;cursor:pointer}
   <a href="#" onclick="showPage('loginPage')">Back to Login</a>
 </div>
 
+<!-- MAIN MESSENGER PAGE -->
 <div id="mainPage" class="hidden">
   <h2>Messenger</h2>
   <input type="text" id="searchBox" placeholder="Search user by name or mobile..." oninput="searchUsers()">
@@ -62,8 +66,9 @@ button{background:#4CAF50;color:#fff;border:none;cursor:pointer}
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-app.js";
 import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, sendPasswordResetEmail, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-auth.js";
-import { getFirestore, setDoc, doc, collection, query, where, getDocs, addDoc, orderBy, onSnapshot, serverTimestamp } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js";
+import { getFirestore, setDoc, doc, collection, query, getDocs, addDoc, orderBy, onSnapshot, serverTimestamp } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js";
 
+// 🔹 FIREBASE CONFIGURATION
 const firebaseConfig = {
   apiKey: "AIzaSyDA3y67A-d77q1zwh5_GHtYundQyudvbdc",
   authDomain: "freefire-7f9b7.firebaseapp.com",
@@ -80,21 +85,24 @@ const db = getFirestore(app);
 let currentUser = null;
 let selectedUser = null;
 
+// 🔹 PAGE SWITCHING
 window.showPage = (id) => {
   document.querySelectorAll('.container').forEach(e=>e.classList.add('hidden'));
   document.getElementById(id).classList.remove('hidden');
 };
 
+// 🔹 AUTH STATE CHECK
 onAuthStateChanged(auth, (user)=>{
   if(user){
     currentUser = user;
     showPage('mainPage');
-    loadConversationHistory();
+    loadUsers();
   }else{
     showPage('loginPage');
   }
 });
 
+// 🔹 SIGNUP
 window.signup = async ()=>{
   const name = nameEl.value, mobile = mobileEl.value, email = emailEl.value, pass = passwordEl.value, dob = dobEl.value;
   try{
@@ -106,15 +114,17 @@ window.signup = async ()=>{
 };
 const nameEl=document.getElementById("name"),mobileEl=document.getElementById("mobile"),emailEl=document.getElementById("email"),passwordEl=document.getElementById("password"),dobEl=document.getElementById("dob");
 
+// 🔹 LOGIN
 window.login = async ()=>{
   const email=document.getElementById("loginEmail").value,pass=document.getElementById("loginPass").value;
   try{
     await signInWithEmailAndPassword(auth,email,pass);
     showPage('mainPage');
-    loadConversationHistory();
+    loadUsers();
   }catch(e){alert(e.message);}
 };
 
+// 🔹 RESET PASSWORD
 window.resetPass = async ()=>{
   const email=document.getElementById("forgotEmail").value;
   try{
@@ -123,38 +133,44 @@ window.resetPass = async ()=>{
   }catch(e){alert(e.message);}
 };
 
+// 🔹 LOGOUT
 window.logout = ()=> signOut(auth);
 
-async function loadConversationHistory(){
-  const q = query(collection(db,"users"));
-  const snapshot = await getDocs(q);
-  const list = document.getElementById("userList");
-  list.innerHTML="";
+// 🔹 LOAD USERS
+async function loadUsers(){
+  document.getElementById("userList").innerHTML="";
 }
 
+// 🔹 SMART SEARCH FUNCTION
 window.searchUsers = async ()=>{
-  const term=document.getElementById("searchBox").value.toLowerCase();
-  const list=document.getElementById("userList");
-  list.innerHTML="";
-  const q=query(collection(db,"users"));
-  const snapshot=await getDocs(q);
-  snapshot.forEach(docSnap=>{
-    const u=docSnap.data();
-    if((u.name&&u.name.toLowerCase().includes(term))||(u.mobile&&u.mobile.includes(term))){
-      if(u.uid!==currentUser.uid){
-        const div=document.createElement("div");
-        div.className="user";
-        div.textContent=u.name+" ("+u.mobile+")";
-        div.onclick=()=>openChat(u);
+  const term = document.getElementById("searchBox").value.toLowerCase().trim();
+  const list = document.getElementById("userList");
+  list.innerHTML = "";
+
+  if(term === "") return;
+
+  const q = query(collection(db, "users"));
+  const snapshot = await getDocs(q);
+  snapshot.forEach(docSnap => {
+    const u = docSnap.data();
+    if(u.uid !== currentUser.uid) {
+      const nameMatch = u.name && u.name.toLowerCase().includes(term);
+      const mobileMatch = u.mobile && u.mobile.toLowerCase().includes(term);
+      if(nameMatch || mobileMatch) {
+        const div = document.createElement("div");
+        div.className = "user";
+        div.textContent = u.name + " (" + u.mobile + ")";
+        div.onclick = () => openChat(u);
         list.appendChild(div);
       }
     }
   });
 };
 
+// 🔹 OPEN CHAT
 async function openChat(u){
-  selectedUser=u;
-  document.getElementById("chatArea").innerHTML="<b>Chat with "+u.name+"</b>";
+  selectedUser = u;
+  document.getElementById("chatArea").innerHTML="<b>Chat with "+u.name+"</b><br>";
   const chatId = currentUser.uid < u.uid ? currentUser.uid+"_"+u.uid : u.uid+"_"+currentUser.uid;
   const msgRef = collection(db,"chats",chatId,"messages");
   const q = query(msgRef, orderBy("timestamp"));
@@ -172,6 +188,7 @@ async function openChat(u){
   });
 }
 
+// 🔹 SEND MESSAGE
 window.sendMessage = async ()=>{
   const input=document.getElementById("messageInput");
   if(!selectedUser||!input.value.trim())return;
@@ -185,4 +202,4 @@ window.sendMessage = async ()=>{
 };
 </script>
 </body>
-    </html>
+</html>
