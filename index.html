@@ -1,300 +1,188 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Messenger Chat • GEN-Z BD</title>
-<script type="module">
-  // ✅ Firebase setup
-  import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-app.js";
-  import {
-    getAuth,
-    onAuthStateChanged,
-    signOut
-  } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-auth.js";
-  import {
-    getFirestore,
-    collection,
-    doc,
-    getDoc,
-    getDocs,
-    setDoc,
-    addDoc,
-    query,
-    where,
-    orderBy,
-    onSnapshot,
-    serverTimestamp
-  } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-firestore.js";
-
-  const firebaseConfig = {
-    apiKey: "YOUR_API_KEY",
-    authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
-    projectId: "YOUR_PROJECT_ID",
-    storageBucket: "YOUR_PROJECT_ID.appspot.com",
-    messagingSenderId: "YOUR_SENDER_ID",
-    appId: "YOUR_APP_ID"
-  };
-
-  const app = initializeApp(firebaseConfig);
-  const auth = getAuth(app);
-  const db = getFirestore(app);
-
-  const userList = document.getElementById("userList");
-  const convoList = document.getElementById("convoList");
-  const chatBox = document.getElementById("chatBox");
-  const chatMessages = document.getElementById("chatMessages");
-  const chatInput = document.getElementById("chatInput");
-  const chatSend = document.getElementById("chatSend");
-  const searchInput = document.getElementById("searchInput");
-
-  let currentUser = null;
-  let currentChatUser = null;
-
-  // ✅ User login check
-  onAuthStateChanged(auth, async (user) => {
-    if (!user) {
-      window.location.href = "login.html";
-    } else {
-      currentUser = user;
-      loadConversationHistory();
-    }
-  });
-
-  // ✅ Search for users (only when typing)
-  searchInput.addEventListener("input", async () => {
-    const searchText = searchInput.value.trim().toLowerCase();
-    userList.innerHTML = "";
-
-    if (searchText === "") return;
-
-    const usersRef = collection(db, "users");
-    const snapshot = await getDocs(usersRef);
-
-    snapshot.forEach((docu) => {
-      const data = docu.data();
-      if (
-        data.name.toLowerCase().includes(searchText) ||
-        data.mobile.includes(searchText)
-      ) {
-        if (data.uid !== currentUser.uid) {
-          const li = document.createElement("li");
-          li.textContent = data.name + " (" + data.mobile + ")";
-          li.onclick = () => openChat(data);
-          userList.appendChild(li);
-        }
-      }
-    });
-  });
-
-  // ✅ Load conversation history (Messenger style)
-  async function loadConversationHistory() {
-    convoList.innerHTML = "";
-    const chatsRef = collection(db, "chats");
-    const q = query(chatsRef, orderBy("lastMessageTime", "desc"));
-    const snapshot = await getDocs(q);
-
-    snapshot.forEach((docu) => {
-      const data = docu.data();
-      if (data.participants && data.participants.includes(currentUser.uid)) {
-        const otherUser = data.participants.find((u) => u !== currentUser.uid);
-        getDoc(doc(db, "users", otherUser)).then((udoc) => {
-          if (udoc.exists()) {
-            const u = udoc.data();
-            const li = document.createElement("li");
-            li.textContent = u.name + " (" + u.mobile + ")";
-            li.onclick = () => openChat(u);
-            convoList.appendChild(li);
-          }
-        });
-      }
-    });
-  }
-
-  // ✅ Open chat
-  async function openChat(userData) {
-    currentChatUser = userData;
-    chatBox.style.display = "block";
-    chatMessages.innerHTML = "";
-
-    const chatId =
-      currentUser.uid < userData.uid
-        ? currentUser.uid + "_" + userData.uid
-        : userData.uid + "_" + currentUser.uid;
-
-    const chatRef = doc(db, "chats", chatId);
-    const chatSnap = await getDoc(chatRef);
-    if (!chatSnap.exists()) {
-      await setDoc(chatRef, {
-        participants: [currentUser.uid, userData.uid],
-        lastMessageTime: serverTimestamp(),
-      });
-    }
-
-    const messagesRef = collection(db, "chats", chatId, "messages");
-    const q = query(messagesRef, orderBy("timestamp", "asc"));
-    onSnapshot(q, (snapshot) => {
-      chatMessages.innerHTML = "";
-      snapshot.forEach((msg) => {
-        const data = msg.data();
-        const div = document.createElement("div");
-        div.className =
-          data.senderId === currentUser.uid ? "sent" : "received";
-        div.textContent = data.text;
-        chatMessages.appendChild(div);
-      });
-      chatMessages.scrollTop = chatMessages.scrollHeight;
-    });
-
-    chatSend.onclick = async () => {
-      const text = chatInput.value.trim();
-      if (text === "") return;
-      chatInput.value = "";
-
-      await addDoc(messagesRef, {
-        senderId: currentUser.uid,
-        receiverId: userData.uid,
-        text,
-        timestamp: serverTimestamp(),
-      });
-
-      await setDoc(
-        chatRef,
-        {
-          lastMessageTime: serverTimestamp(),
-        },
-        { merge: true }
-      );
-    };
-  }
-
-  // ✅ Logout
-  document.getElementById("logoutBtn").onclick = () => {
-    signOut(auth);
-  };
-</script>
-
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Messenger App</title>
 <style>
-  body {
-    font-family: Arial, sans-serif;
-    background: #f5f6f7;
-    margin: 0;
-    padding: 0;
-  }
-  header {
-    background: #0084ff;
-    color: white;
-    padding: 10px;
-    text-align: center;
-  }
-  #container {
-    display: flex;
-    height: calc(100vh - 60px);
-  }
-  #sidebar {
-    width: 30%;
-    background: white;
-    border-right: 1px solid #ccc;
-    overflow-y: auto;
-    display: flex;
-    flex-direction: column;
-  }
-  #searchInput {
-    padding: 10px;
-    margin: 10px;
-    border: 1px solid #ccc;
-    border-radius: 10px;
-  }
-  ul {
-    list-style: none;
-    margin: 0;
-    padding: 0;
-  }
-  li {
-    padding: 12px;
-    border-bottom: 1px solid #eee;
-    cursor: pointer;
-  }
-  li:hover {
-    background: #f0f0f0;
-  }
-  #chatBox {
-    flex: 1;
-    display: none;
-    flex-direction: column;
-  }
-  #chatMessages {
-    flex: 1;
-    overflow-y: auto;
-    padding: 10px;
-  }
-  .sent {
-    text-align: right;
-    background: #dcf8c6;
-    margin: 5px;
-    padding: 8px;
-    border-radius: 10px;
-    display: inline-block;
-  }
-  .received {
-    text-align: left;
-    background: #fff;
-    margin: 5px;
-    padding: 8px;
-    border-radius: 10px;
-    display: inline-block;
-  }
-  #chatInputArea {
-    display: flex;
-    padding: 10px;
-    border-top: 1px solid #ccc;
-  }
-  #chatInput {
-    flex: 1;
-    padding: 10px;
-    border-radius: 10px;
-    border: 1px solid #ccc;
-  }
-  #chatSend {
-    margin-left: 10px;
-    padding: 10px 20px;
-    background: #0084ff;
-    color: white;
-    border: none;
-    border-radius: 10px;
-  }
-  #logoutBtn {
-    margin: 10px;
-    padding: 8px 15px;
-    background: #ff4d4d;
-    color: white;
-    border: none;
-    border-radius: 10px;
-    cursor: pointer;
-  }
+body{font-family:Arial;background:#f0f0f0;margin:0;padding:0;text-align:center}
+.container{background:#fff;margin:30px auto;padding:20px;border-radius:10px;box-shadow:0 0 10px rgba(0,0,0,0.1);width:90%;max-width:400px}
+input,button{width:90%;padding:10px;margin:8px 0;border-radius:5px;border:1px solid #ccc}
+button{background:#4CAF50;color:#fff;border:none;cursor:pointer}
+.hidden{display:none}
+.user{padding:10px;margin:5px;background:#fff;border-radius:5px;cursor:pointer}
+.user:hover{background:#eee}
+.message{padding:8px;border-radius:5px;margin:5px;width:fit-content;max-width:70%}
+.sent{background:#DCF8C6;margin-left:auto}
+.received{background:#eee;margin-right:auto}
+#chatArea{height:300px;overflow-y:auto;background:#fff;padding:10px;margin-top:10px;border-radius:8px}
 </style>
 </head>
 <body>
-  <header>
-    <h2>GEN-Z BD Messenger</h2>
-  </header>
 
-  <div id="container">
-    <div id="sidebar">
-      <input type="text" id="searchInput" placeholder="Search by name or mobile..." />
-      <h4 style="margin-left:10px;">Conversations</h4>
-      <ul id="convoList"></ul>
-      <ul id="userList"></ul>
-      <button id="logoutBtn">Logout</button>
-    </div>
+<div id="loginPage" class="container">
+  <h2>Login</h2>
+  <input id="loginEmail" type="email" placeholder="Email">
+  <input id="loginPass" type="password" placeholder="Password">
+  <button onclick="login()">Login</button>
+  <a href="#" onclick="showPage('forgotPage')">Forgot Password?</a>
+  <a href="#" onclick="showPage('signupPage')">Create Account</a>
+</div>
 
-    <div id="chatBox">
-      <div id="chatMessages"></div>
-      <div id="chatInputArea">
-        <input id="chatInput" placeholder="Type a message..." />
-        <button id="chatSend">Send</button>
-      </div>
-    </div>
+<div id="signupPage" class="container hidden">
+  <h2>Sign Up</h2>
+  <input id="name" placeholder="Full Name">
+  <input id="mobile" placeholder="Mobile Number">
+  <input id="email" type="email" placeholder="Email">
+  <input id="password" type="password" placeholder="Password">
+  <input id="dob" type="date">
+  <button onclick="signup()">Sign Up</button>
+  <a href="#" onclick="showPage('loginPage')">Back to Login</a>
+</div>
+
+<div id="forgotPage" class="container hidden">
+  <h2>Reset Password</h2>
+  <input id="forgotEmail" type="email" placeholder="Enter Email">
+  <button onclick="resetPass()">Send Reset Link</button>
+  <a href="#" onclick="showPage('loginPage')">Back to Login</a>
+</div>
+
+<div id="mainPage" class="hidden">
+  <h2>Messenger</h2>
+  <input type="text" id="searchBox" placeholder="Search user by name or mobile..." oninput="searchUsers()">
+  <div id="userList"></div>
+  <div id="chatArea"></div>
+  <div style="margin-top:10px;">
+    <input id="messageInput" placeholder="Type message...">
+    <button onclick="sendMessage()">Send</button>
   </div>
+  <button onclick="logout()" style="background:#f44336">Logout</button>
+</div>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-app.js";
+import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, sendPasswordResetEmail, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-auth.js";
+import { getFirestore, setDoc, doc, collection, query, where, getDocs, addDoc, orderBy, onSnapshot, serverTimestamp } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyDA3y67A-d77q1zwh5_GHtYundQyudvbdc",
+  authDomain: "freefire-7f9b7.firebaseapp.com",
+  projectId: "freefire-7f9b7",
+  storageBucket: "freefire-7f9b7.appspot.com",
+  messagingSenderId: "69091172437",
+  appId: "1:69091172437:web:fd82e4ded5d5252bf4b4dc"
+};
+
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db = getFirestore(app);
+
+let currentUser = null;
+let selectedUser = null;
+
+window.showPage = (id) => {
+  document.querySelectorAll('.container').forEach(e=>e.classList.add('hidden'));
+  document.getElementById(id).classList.remove('hidden');
+};
+
+onAuthStateChanged(auth, (user)=>{
+  if(user){
+    currentUser = user;
+    showPage('mainPage');
+    loadConversationHistory();
+  }else{
+    showPage('loginPage');
+  }
+});
+
+window.signup = async ()=>{
+  const name = nameEl.value, mobile = mobileEl.value, email = emailEl.value, pass = passwordEl.value, dob = dobEl.value;
+  try{
+    const res = await createUserWithEmailAndPassword(auth,email,pass);
+    await setDoc(doc(db,"users",res.user.uid),{uid:res.user.uid,name,mobile,email,dob});
+    alert("Account created!");
+    showPage('loginPage');
+  }catch(e){alert(e.message);}
+};
+const nameEl=document.getElementById("name"),mobileEl=document.getElementById("mobile"),emailEl=document.getElementById("email"),passwordEl=document.getElementById("password"),dobEl=document.getElementById("dob");
+
+window.login = async ()=>{
+  const email=document.getElementById("loginEmail").value,pass=document.getElementById("loginPass").value;
+  try{
+    await signInWithEmailAndPassword(auth,email,pass);
+    showPage('mainPage');
+    loadConversationHistory();
+  }catch(e){alert(e.message);}
+};
+
+window.resetPass = async ()=>{
+  const email=document.getElementById("forgotEmail").value;
+  try{
+    await sendPasswordResetEmail(auth,email);
+    alert("Reset link sent!");
+  }catch(e){alert(e.message);}
+};
+
+window.logout = ()=> signOut(auth);
+
+async function loadConversationHistory(){
+  const q = query(collection(db,"users"));
+  const snapshot = await getDocs(q);
+  const list = document.getElementById("userList");
+  list.innerHTML="";
+}
+
+window.searchUsers = async ()=>{
+  const term=document.getElementById("searchBox").value.toLowerCase();
+  const list=document.getElementById("userList");
+  list.innerHTML="";
+  const q=query(collection(db,"users"));
+  const snapshot=await getDocs(q);
+  snapshot.forEach(docSnap=>{
+    const u=docSnap.data();
+    if((u.name&&u.name.toLowerCase().includes(term))||(u.mobile&&u.mobile.includes(term))){
+      if(u.uid!==currentUser.uid){
+        const div=document.createElement("div");
+        div.className="user";
+        div.textContent=u.name+" ("+u.mobile+")";
+        div.onclick=()=>openChat(u);
+        list.appendChild(div);
+      }
+    }
+  });
+};
+
+async function openChat(u){
+  selectedUser=u;
+  document.getElementById("chatArea").innerHTML="<b>Chat with "+u.name+"</b>";
+  const chatId = currentUser.uid < u.uid ? currentUser.uid+"_"+u.uid : u.uid+"_"+currentUser.uid;
+  const msgRef = collection(db,"chats",chatId,"messages");
+  const q = query(msgRef, orderBy("timestamp"));
+  onSnapshot(q,(snap)=>{
+    const area=document.getElementById("chatArea");
+    area.innerHTML="<b>Chat with "+u.name+"</b><br>";
+    snap.forEach(d=>{
+      const m=d.data();
+      const div=document.createElement("div");
+      div.className="message "+(m.senderId===currentUser.uid?"sent":"received");
+      div.textContent=m.message;
+      area.appendChild(div);
+    });
+    area.scrollTop=area.scrollHeight;
+  });
+}
+
+window.sendMessage = async ()=>{
+  const input=document.getElementById("messageInput");
+  if(!selectedUser||!input.value.trim())return;
+  const chatId = currentUser.uid < selectedUser.uid ? currentUser.uid+"_"+selectedUser.uid : selectedUser.uid+"_"+currentUser.uid;
+  await addDoc(collection(db,"chats",chatId,"messages"),{
+    senderId:currentUser.uid,
+    message:input.value,
+    timestamp:serverTimestamp()
+  });
+  input.value="";
+};
+</script>
 </body>
-</html>
+    </html>
