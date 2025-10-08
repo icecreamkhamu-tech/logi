@@ -3,10 +3,10 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Messenger App with Search</title>
+<title>Messenger App</title>
 <style>
 body{font-family:Arial;background:#f0f0f0;margin:0;padding:0;text-align:center}
-.container{background:#fff;margin:20px auto;padding:20px;border-radius:10px;box-shadow:0 0 10px rgba(0,0,0,0.1);width:90%;max-width:500px}
+.container{background:#fff;margin:30px auto;padding:20px;border-radius:10px;box-shadow:0 0 10px rgba(0,0,0,0.1);width:90%;max-width:400px}
 input,button{width:90%;padding:10px;margin:8px 0;border-radius:5px;border:1px solid #ccc}
 button{background:#4CAF50;color:#fff;border:none;cursor:pointer}
 .hidden{display:none}
@@ -16,21 +16,26 @@ button{background:#4CAF50;color:#fff;border:none;cursor:pointer}
 .sent{background:#DCF8C6;margin-left:auto}
 .received{background:#eee;margin-right:auto}
 #chatArea{height:300px;overflow-y:auto;background:#fff;padding:10px;margin-top:10px;border-radius:8px}
-.suggestion{padding:8px;background:#f9f9f9;border-bottom:1px solid #ddd;cursor:pointer}
-.suggestion:hover{background:#eee}
+#suggestions{background:#fff;max-height:200px;overflow-y:auto;}
+.suggestionItem{padding:8px;border-bottom:1px solid #ddd;cursor:pointer;}
+.suggestionItem:hover{background:#eee;}
+.conversationItem{padding:10px;border-bottom:1px solid #ddd;cursor:pointer;}
+.conversationItem:hover{background:#eee;}
 </style>
 </head>
 <body>
 
+<!-- LOGIN -->
 <div id="loginPage" class="container">
   <h2>Login</h2>
   <input id="loginEmail" type="email" placeholder="Email">
   <input id="loginPass" type="password" placeholder="Password">
   <button onclick="login()">Login</button>
-  <a href="#" onclick="showPage('forgotPage')">Forgot Password?</a><br>
+  <a href="#" onclick="showPage('forgotPage')">Forgot Password?</a>
   <a href="#" onclick="showPage('signupPage')">Create Account</a>
 </div>
 
+<!-- SIGNUP -->
 <div id="signupPage" class="container hidden">
   <h2>Sign Up</h2>
   <input id="name" placeholder="Full Name">
@@ -42,6 +47,7 @@ button{background:#4CAF50;color:#fff;border:none;cursor:pointer}
   <a href="#" onclick="showPage('loginPage')">Back to Login</a>
 </div>
 
+<!-- FORGOT PASSWORD -->
 <div id="forgotPage" class="container hidden">
   <h2>Reset Password</h2>
   <input id="forgotEmail" type="email" placeholder="Enter Email">
@@ -49,18 +55,22 @@ button{background:#4CAF50;color:#fff;border:none;cursor:pointer}
   <a href="#" onclick="showPage('loginPage')">Back to Login</a>
 </div>
 
+<!-- MAIN PAGE -->
 <div id="mainPage" class="container hidden">
   <h2>Messenger</h2>
-  <input type="text" id="searchBox" placeholder="Search user by name..." oninput="showSuggestions()">
+  <input type="text" id="searchBox" placeholder="Search user..." oninput="suggestUsers()" onkeydown="handleEnter(event)">
   <div id="suggestions"></div>
   <h3>Conversations</h3>
-  <div id="userList"></div>
+  <div id="conversationList"></div>
+</div>
+
+<!-- CHAT PAGE -->
+<div id="chatPage" class="container hidden">
+  <button onclick="backToMain()">⬅ Back</button>
+  <h3 id="chatWith"></h3>
   <div id="chatArea"></div>
-  <div style="margin-top:10px;">
-    <input id="messageInput" placeholder="Type message...">
-    <button onclick="sendMessage()">Send</button>
-  </div>
-  <button onclick="logout()" style="background:#f44336">Logout</button>
+  <input id="messageInput" placeholder="Type message...">
+  <button onclick="sendMessage()">Send</button>
 </div>
 
 <script type="module">
@@ -68,7 +78,6 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/9.23.0/firebas
 import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, sendPasswordResetEmail, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-auth.js";
 import { getFirestore, setDoc, doc, collection, query, getDocs, addDoc, orderBy, onSnapshot, serverTimestamp } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js";
 
-// 🔹 Firebase Configuration
 const firebaseConfig = {
   apiKey: "AIzaSyDA3y67A-d77q1zwh5_GHtYundQyudvbdc",
   authDomain: "freefire-7f9b7.firebaseapp.com",
@@ -94,13 +103,12 @@ onAuthStateChanged(auth, (user)=>{
   if(user){
     currentUser = user;
     showPage('mainPage');
-    loadUsers();
+    loadConversations();
   }else{
     showPage('loginPage');
   }
 });
 
-// 🔹 Signup
 window.signup = async ()=>{
   const name = nameEl.value, mobile = mobileEl.value, email = emailEl.value, pass = passwordEl.value, dob = dobEl.value;
   try{
@@ -112,17 +120,15 @@ window.signup = async ()=>{
 };
 const nameEl=document.getElementById("name"),mobileEl=document.getElementById("mobile"),emailEl=document.getElementById("email"),passwordEl=document.getElementById("password"),dobEl=document.getElementById("dob");
 
-// 🔹 Login
 window.login = async ()=>{
   const email=document.getElementById("loginEmail").value,pass=document.getElementById("loginPass").value;
   try{
     await signInWithEmailAndPassword(auth,email,pass);
     showPage('mainPage');
-    loadUsers();
+    loadConversations();
   }catch(e){alert(e.message);}
 };
 
-// 🔹 Reset Password
 window.resetPass = async ()=>{
   const email=document.getElementById("forgotEmail").value;
   try{
@@ -131,99 +137,79 @@ window.resetPass = async ()=>{
   }catch(e){alert(e.message);}
 };
 
-// 🔹 Logout
 window.logout = ()=> signOut(auth);
 
-// 🔹 Load Conversations
-async function loadUsers(){
-  const q = query(collection(db,"users"));
+// Suggest users
+window.suggestUsers = async ()=>{
+  const term = document.getElementById("searchBox").value.toLowerCase();
+  const list = document.getElementById("suggestions");
+  list.innerHTML="";
+  if(term==="") return;
+  const q = query(collection(db,"users"),orderBy("name"));
   const snapshot = await getDocs(q);
-  const list = document.getElementById("userList");
-  list.innerHTML="";
   snapshot.forEach(docSnap=>{
-    const u=docSnap.data();
-    if(u.uid!==currentUser.uid){
+    const u = docSnap.data();
+    if(u.name && u.name.toLowerCase().includes(term) && u.uid !== currentUser.uid){
       const div=document.createElement("div");
-      div.className="user";
+      div.className="suggestionItem";
       div.textContent=u.name;
       div.onclick=()=>openChat(u);
       list.appendChild(div);
     }
   });
+};
+
+// Handle enter press
+function handleEnter(e){
+  if(e.key==="Enter") searchUsers();
 }
 
-// 🔹 Search Suggestions
-async function showSuggestions(){
-  const term=document.getElementById("searchBox").value.toLowerCase().trim();
-  const sugDiv=document.getElementById("suggestions");
-  sugDiv.innerHTML="";
-  if(term==="") return;
-
-  const q=query(collection(db,"users"));
-  const snapshot=await getDocs(q);
+// Load conversation list
+async function loadConversations(){
+  const convList = document.getElementById("conversationList");
+  convList.innerHTML="";
+  const q = query(collection(db,"users"),orderBy("name"));
+  const snapshot = await getDocs(q);
   snapshot.forEach(docSnap=>{
-    const u=docSnap.data();
-    if(u.name && u.name.toLowerCase().includes(term) && u.uid!==currentUser.uid){
+    const u = docSnap.data();
+    if(u.uid !== currentUser.uid){
       const div=document.createElement("div");
-      div.className="suggestion";
-      div.textContent=u.name;
-      div.onclick=()=>{
-        document.getElementById("searchBox").value=u.name;
-        sugDiv.innerHTML="";
-        searchUsers();
-      };
-      sugDiv.appendChild(div);
-    }
-  });
-}
-
-// 🔹 Search Users
-async function searchUsers(){
-  const term=document.getElementById("searchBox").value.toLowerCase().trim();
-  const list=document.getElementById("userList");
-  list.innerHTML="";
-  if(term==="") return;
-
-  const q=query(collection(db,"users"));
-  const snapshot=await getDocs(q);
-  snapshot.forEach(docSnap=>{
-    const u=docSnap.data();
-    if(u.name && u.name.toLowerCase().includes(term) && u.uid!==currentUser.uid){
-      const div=document.createElement("div");
-      div.className="user";
+      div.className="conversationItem";
       div.textContent=u.name;
       div.onclick=()=>openChat(u);
-      list.appendChild(div);
+      convList.appendChild(div);
     }
   });
 }
 
-// 🔹 Open Chat
+// Open chat
 async function openChat(u){
   selectedUser=u;
-  document.getElementById("chatArea").innerHTML="<b>Chat with "+u.name+"</b><br>";
+  showPage('chatPage');
+  document.getElementById("chatWith").textContent="Chat with "+u.name;
   const chatId = currentUser.uid < u.uid ? currentUser.uid+"_"+u.uid : u.uid+"_"+currentUser.uid;
-  const msgRef = collection(db,"chats",chatId,"messages");
-  const q = query(msgRef, orderBy("timestamp"));
+  const chatArea=document.getElementById("chatArea");
+  chatArea.innerHTML="";
+  const msgRef=collection(db,"chats",chatId,"messages");
+  const q=query(msgRef,orderBy("timestamp"));
   onSnapshot(q,(snap)=>{
-    const area=document.getElementById("chatArea");
-    area.innerHTML="<b>Chat with "+u.name+"</b><br>";
+    chatArea.innerHTML="";
     snap.forEach(d=>{
       const m=d.data();
       const div=document.createElement("div");
       div.className="message "+(m.senderId===currentUser.uid?"sent":"received");
       div.textContent=m.message;
-      area.appendChild(div);
+      chatArea.appendChild(div);
     });
-    area.scrollTop=area.scrollHeight;
+    chatArea.scrollTop=chatArea.scrollHeight;
   });
 }
 
-// 🔹 Send Message
-window.sendMessage = async ()=>{
+// Send message
+window.sendMessage=async()=>{
   const input=document.getElementById("messageInput");
-  if(!selectedUser||!input.value.trim())return;
-  const chatId = currentUser.uid < selectedUser.uid ? currentUser.uid+"_"+selectedUser.uid : selectedUser.uid+"_"+currentUser.uid;
+  if(!selectedUser||!input.value.trim()) return;
+  const chatId=currentUser.uid<selectedUser.uid?currentUser.uid+"_"+selectedUser.uid:selectedUser.uid+"_"+currentUser.uid;
   await addDoc(collection(db,"chats",chatId,"messages"),{
     senderId:currentUser.uid,
     message:input.value,
@@ -231,6 +217,11 @@ window.sendMessage = async ()=>{
   });
   input.value="";
 };
+
+// Back to main
+function backToMain(){
+  showPage('mainPage');
+}
 </script>
 </body>
-    </html>
+</html>
